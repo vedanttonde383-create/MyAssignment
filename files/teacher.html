@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your courses | MyAssignment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header" id="app-header"></header>
+
+  <main class="container teacher-layout">
+    <aside class="side">
+      <h2>Your courses</h2>
+      <ul class="course-list" id="course-list"></ul>
+
+      <form id="course-form" class="stack" novalidate>
+        <label for="course-title">New course</label>
+        <input id="course-title" type="text" placeholder="e.g. Web Technologies" maxlength="80">
+        <button class="btn btn-ghost" type="submit">Add course</button>
+      </form>
+    </aside>
+
+    <section id="content"></section>
+  </main>
+
+  <!-- New assignment -->
+  <dialog id="assignment-dlg" aria-labelledby="assignment-title">
+    <form id="assignment-form" class="dialog-body" novalidate>
+      <div class="dialog-head">
+        <h2 id="assignment-title">New assignment</h2>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="a-title">Title</label>
+          <input id="a-title" type="text" maxlength="120">
+        </div>
+        <div class="field full">
+          <label for="a-desc">Instructions</label>
+          <textarea id="a-desc" maxlength="2000" placeholder="What should students submit?"></textarea>
+        </div>
+        <div class="field full">
+          <label for="a-question-url">Question link (optional)</label>
+          <input id="a-question-url" type="url" placeholder="https://drive.google.com/..." autocomplete="url">
+          <p class="hint">Share the Drive file as Anyone with the link and Viewer.</p>
+        </div>
+        <div class="field">
+          <label for="a-deadline">Deadline</label>
+          <input id="a-deadline" type="datetime-local">
+        </div>
+        <div class="field">
+          <label for="a-marks">Maximum marks</label>
+          <input id="a-marks" type="number" min="1" max="1000" step="1" value="100">
+        </div>
+      </div>
+      <p class="form-error" id="assignment-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-quiet" id="assignment-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Publish assignment</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Review submissions -->
+  <dialog id="review-dlg" class="wide" aria-labelledby="review-title"></dialog>
+
+  <script src="firebase-ready.js"></script>
+  <script src="store.js"></script>
+  <script src="ui.js"></script>
+  <script src="teacher.js"></script>
+  <script type="module" src="firebase.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your assignments | MyAssignment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header" id="app-header"></header>
+
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <h1>Your assignments</h1>
+        <p class="lead" id="summary"></p>
+      </div>
+      <form id="join-form" class="inline-form" novalidate>
+        <label for="join-code" class="sr-only">Course join code</label>
+        <input id="join-code" type="text" placeholder="Course join code" maxlength="8" autocomplete="off">
+        <button class="btn btn-ghost" type="submit">Join course</button>
+      </form>
+    </div>
+
+    <div class="chips" id="course-chips"></div>
+
+    <div class="tabs" role="tablist" id="tabs">
+      <button type="button" role="tab" data-tab="pending" aria-selected="true">To hand in<span class="count">0</span></button>
+      <button type="button" role="tab" data-tab="submitted" aria-selected="false">Submitted<span class="count">0</span></button>
+      <button type="button" role="tab" data-tab="graded" aria-selected="false">Graded<span class="count">0</span></button>
+    </div>
+
+    <ul class="list" id="list"></ul>
+  </main>
+
+  <dialog id="dlg" aria-labelledby="dlg-title"></dialog>
+
+  <script src="firebase-ready.js"></script>
+  <script src="store.js"></script>
+  <script src="ui.js"></script>
+  <script src="student.js"></script>
+  <script type="module" src="firebase.js"></script>
+</body>
+</html>

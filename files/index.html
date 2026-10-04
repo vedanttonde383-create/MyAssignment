@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MyAssignment: Assignment Submission Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="auth">
+    <section class="auth-intro">
+      <a class="brand" href="index.html">MyAssignment</a>
+      <h1>Know what's due.<br>Hand it in on time.</h1>
+      <p>Teachers post assignments. Students share a link to their work before the deadline. Grades and feedback arrive in the same place.</p>
+
+    </section>
+
+    <section class="auth-panel">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-login" aria-selected="true" aria-controls="login-form">Log in</button>
+        <button type="button" role="tab" id="tab-register" aria-selected="false" aria-controls="register-form">Create account</button>
+      </div>
+
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary" type="submit" id="login-btn">Log in</button>
+      </form>
+
+      <form id="register-form" novalidate hidden>
+        <div class="field">
+          <label for="reg-name">Full name</label>
+          <input id="reg-name" type="text" autocomplete="name" maxlength="80" required>
+        </div>
+        <div class="field">
+          <label for="reg-email">Email</label>
+          <input id="reg-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="reg-password">Password</label>
+          <input id="reg-password" type="password" autocomplete="new-password" minlength="6" required>
+          <p class="hint">At least 6 characters.</p>
+        </div>
+        <fieldset>
+          <legend>I am a</legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="role" value="student" checked> Student</label>
+            <label class="choice"><input type="radio" name="role" value="teacher"> Teacher</label>
+          </div>
+        </fieldset>
+        <button class="btn btn-primary" type="submit" id="register-btn">Create account</button>
+      </form>
+
+      <p class="form-error" id="auth-error" role="alert"></p>
+    </section>
+  </main>
+
+  <script src="firebase-ready.js"></script>
+  <script src="store.js"></script>
+  <script src="ui.js"></script>
+  <script src="auth.js"></script>
+  <script type="module" src="firebase.js"></script>
+</body>
+</html>

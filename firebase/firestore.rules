@@ -1,0 +1,253 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Anything not matched below is denied by default.
+
+    /* ------------------------------------------------------------------
+       Helpers
+       ------------------------------------------------------------------ */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && myProfile().role == role;
+    }
+
+    // A student is enrolled when enrollments/{courseId}_{uid} exists.
+    function enrolled(courseId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/enrollments/$(courseId + '_' + request.auth.uid));
+    }
+
+    function courseData(courseId) {
+      return get(/databases/$(database)/documents/courses/$(courseId)).data;
+    }
+
+    function assignmentData(assignmentId) {
+      return get(/databases/$(database)/documents/assignments/$(assignmentId)).data;
+    }
+
+    function ownsDoc() {
+      return signedIn() && resource.data.teacherId == request.auth.uid;
+    }
+
+    /* ------------------------------------------------------------------
+       users/{uid}
+       Each person can read and create only their own profile.
+      Role is fixed at sign-up and cannot be changed afterwards.
+       ------------------------------------------------------------------ */
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role'])
+        && request.resource.data.keys().hasAll(['name', 'email', 'role'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && (
+          request.resource.data.role == 'student'
+          || request.resource.data.role == 'teacher'
+        );
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80;
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       courses/{courseId}
+       Teachers list their own courses (query: teacherId == uid).
+       Students fetch a course by id once they are enrolled.
+       ------------------------------------------------------------------ */
+
+    match /courses/{courseId} {
+      allow get: if ownsDoc() || enrolled(courseId);
+      allow list: if ownsDoc();
+
+      allow create: if hasRole('teacher')
+        && request.resource.data.keys().hasOnly(['title', 'code', 'teacherId', 'teacherName'])
+        && request.resource.data.keys().hasAll(['title', 'code', 'teacherId', 'teacherName'])
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.teacherName == myProfile().name
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.code is string
+        && request.resource.data.code.size() == 6;
+
+      // Title can change. Owner and join code cannot.
+      allow update: if ownsDoc()
+        && request.resource.data.teacherId == resource.data.teacherId
+        && request.resource.data.teacherName == resource.data.teacherName
+        && request.resource.data.code == resource.data.code
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80;
+
+      allow delete: if ownsDoc();
+    }
+
+    /* ------------------------------------------------------------------
+       joinCodes/{code}
+       Lets a student turn a code into a course id. Anyone signed in can
+       look up one code at a time, but nobody can list all codes.
+       ------------------------------------------------------------------ */
+
+    match /joinCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if hasRole('teacher')
+        && request.resource.data.keys().hasOnly(['courseId', 'teacherId'])
+        && request.resource.data.keys().hasAll(['courseId', 'teacherId'])
+        && request.resource.data.teacherId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/courses/$(request.resource.data.courseId)).data.code == code
+        && getAfter(/databases/$(database)/documents/courses/$(request.resource.data.courseId)).data.teacherId == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if ownsDoc();
+    }
+
+    /* ------------------------------------------------------------------
+       enrollments/{courseId}_{studentUid}
+       Created by the student, and only with a valid join code.
+       ------------------------------------------------------------------ */
+
+    match /enrollments/{enrollmentId} {
+      allow read: if signedIn()
+        && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid);
+
+      allow create: if hasRole('student')
+        && request.resource.data.keys().hasOnly(['courseId', 'studentId', 'studentName', 'studentEmail', 'teacherId', 'code', 'joinedAt'])
+        && request.resource.data.keys().hasAll(['courseId', 'studentId', 'studentName', 'studentEmail', 'teacherId', 'code', 'joinedAt'])
+        && enrollmentId == request.resource.data.courseId + '_' + request.auth.uid
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.studentName == myProfile().name
+        && request.resource.data.studentEmail.lower() == request.auth.token.email.lower()
+        && request.resource.data.joinedAt == request.time
+        && exists(/databases/$(database)/documents/joinCodes/$(request.resource.data.code))
+        && get(/databases/$(database)/documents/joinCodes/$(request.resource.data.code)).data.courseId == request.resource.data.courseId
+        && get(/databases/$(database)/documents/joinCodes/$(request.resource.data.code)).data.teacherId == request.resource.data.teacherId;
+
+      allow update: if false;
+      allow delete: if ownsDoc();   // teacher removes a student
+    }
+
+    /* ------------------------------------------------------------------
+       assignments/{assignmentId}
+       Teacher writes. Enrolled students and the owner read.
+       deadline must be a Firestore Timestamp.
+       ------------------------------------------------------------------ */
+
+    function validDriveUrl(url) {
+      return url is string
+        && url.size() > 0
+        && url.size() <= 2048
+        && url.matches('^https://(drive\\.google\\.com|docs\\.google\\.com)/.+$');
+    }
+
+    function validAssignment(d) {
+      return d.keys().hasOnly(['courseId', 'teacherId', 'title', 'description', 'questionUrl', 'deadline', 'maxMarks', 'createdAt'])
+        && d.keys().hasAll(['courseId', 'teacherId', 'title', 'description', 'deadline', 'maxMarks', 'createdAt'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+        && d.description is string && d.description.size() <= 2000
+        && (!d.keys().hasAny(['questionUrl']) || validDriveUrl(d.questionUrl))
+        && d.deadline is timestamp
+        && d.maxMarks is number && d.maxMarks > 0 && d.maxMarks <= 1000;
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if signedIn()
+        && (resource.data.teacherId == request.auth.uid || enrolled(resource.data.courseId));
+
+      allow create: if hasRole('teacher')
+        && validAssignment(request.resource.data)
+        && request.resource.data.teacherId == request.auth.uid
+        && courseData(request.resource.data.courseId).teacherId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.deadline > request.time;
+
+      allow update: if ownsDoc()
+        && validAssignment(request.resource.data)
+        && request.resource.data.courseId == resource.data.courseId
+        && request.resource.data.teacherId == resource.data.teacherId
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if ownsDoc();
+    }
+
+    /* ------------------------------------------------------------------
+       submissions/{assignmentId}_{studentUid}
+       One document per student per assignment. A resubmission overwrites it
+       until the teacher grades it. "late" is checked against the deadline
+       using the server clock, so it cannot be faked.
+       ------------------------------------------------------------------ */
+
+    function validStudentSubmission(subId) {
+      let d = request.resource.data;
+      let a = assignmentData(d.assignmentId);
+      return d.keys().hasOnly(['assignmentId', 'courseId', 'teacherId', 'studentId', 'studentName', 'submissionUrl', 'submittedAt', 'late', 'marks', 'feedback'])
+        && d.keys().hasAll(['assignmentId', 'courseId', 'teacherId', 'studentId', 'studentName', 'submissionUrl', 'submittedAt', 'late', 'marks', 'feedback'])
+        && subId == d.assignmentId + '_' + request.auth.uid
+        && d.studentId == request.auth.uid
+        && d.courseId == a.courseId
+        && d.teacherId == a.teacherId
+        && enrolled(a.courseId)
+        && d.studentName == myProfile().name
+        && d.submissionUrl is string && d.submissionUrl.size() > 0 && d.submissionUrl.size() <= 2048
+        && d.submissionUrl.matches('^https://(drive\\.google\\.com|docs\\.google\\.com)/.+$')
+        && d.submittedAt == request.time
+        && d.late == (request.time > a.deadline)
+        && d.marks == null
+        && d.feedback == '';
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if signedIn()
+        && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid);
+
+      // First submission
+      allow create: if hasRole('student') && validStudentSubmission(submissionId);
+
+      // Student replaces their link (only while ungraded), or teacher grades.
+      allow update: if (
+          hasRole('student')
+          && resource.data.studentId == request.auth.uid
+          && resource.data.marks == null
+          && validStudentSubmission(submissionId)
+        )
+        || (
+          ownsDoc()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['marks', 'feedback', 'gradedAt'])
+          && request.resource.data.marks is number
+          && request.resource.data.marks >= 0
+          && request.resource.data.marks <= assignmentData(resource.data.assignmentId).maxMarks
+          && request.resource.data.feedback is string
+          && request.resource.data.feedback.size() <= 1000
+          && request.resource.data.gradedAt == request.time
+        );
+
+      // Only the teacher can delete (for example when deleting an assignment).
+      allow delete: if ownsDoc();
+    }
+  }
+}
